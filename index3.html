@@ -1,0 +1,281 @@
+không ổn, khi tôi liên tục đổi sang row rồi column rồi row, thì width và height của item bị auto đè mất hoàn toàn, không
+trả lại 80px
+
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flex Playground thông minh</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #fafafa;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        label {
+            font-size: 14px;
+        }
+
+        select,
+        input[type="number"] {
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #aaa;
+            width: 90px;
+        }
+
+        select:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .container {
+            display: flex;
+            background: #eee;
+            border: 2px dashed #bbb;
+            padding: 10px;
+            width: 600px;
+            height: 400px;
+            resize: both;
+            overflow: auto;
+        }
+
+        .item {
+            /* width: 80px;
+            height: auto; */
+            width: 80px;
+            height: 80px;
+            background: #4a90e2;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            /* margin: 4px; */
+            border-radius: 6px;
+            flex-grow: 0;
+            flex-shrink: 1;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>🧩 Flexbox Playground (tự disable thuộc tính vô hiệu)</h2>
+
+    <div class="controls">
+        <label>
+            Justify-content:
+            <select id="justify">
+                <option>flex-start</option>
+                <option>center</option>
+                <option>flex-end</option>
+                <option>space-between</option>
+                <option>space-around</option>
+                <option>space-evenly</option>
+            </select>
+        </label>
+
+        <label>
+            Align-items:
+            <select id="align">
+                <option>flex-start</option>
+                <option>center</option>
+                <option>flex-end</option>
+                <option>stretch</option>
+            </select>
+        </label>
+
+        <label>
+            Align-content:
+            <select id="alignContent">
+                <option>flex-start</option>
+                <option>center</option>
+                <option>flex-end</option>
+                <option>space-between</option>
+                <option>space-around</option>
+                <option>space-evenly</option>
+                <option>stretch</option>
+            </select>
+        </label>
+
+        <label>
+            Flex-grow:
+            <select id="grow">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+            </select>
+        </label>
+
+        <label>
+            Flex-shrink:
+            <select id="shrink">
+                <option value="0">0</option>
+                <option value="1" selected>1</option>
+                <option value="2">2</option>
+            </select>
+        </label>
+
+        <label>
+            Direction:
+            <select id="direction">
+                <option value="row">row</option>
+                <option value="column">column</option>
+            </select>
+        </label>
+
+        <label>
+            Wrap:
+            <select id="wrap">
+                <option value="nowrap" selected>nowrap</option>
+                <option value="wrap">wrap</option>
+                <option value="wrap-reverse">wrap-reverse</option>
+            </select>
+        </label>
+        <label>
+            Gap (px):
+            <input id="gap" type="number" min="0" max="100" value="4">
+        </label>
+
+        <label>
+            Số lượng ô:
+            <input id="count" type="number" min="1" max="100" value="6">
+        </label>
+    </div>
+
+    <div class="container" id="frame"></div>
+
+    <script>
+        const container = document.getElementById("frame");
+        const justify = document.getElementById("justify");
+        const align = document.getElementById("align");
+        const alignContent = document.getElementById("alignContent");
+        const grow = document.getElementById("grow");
+        const shrink = document.getElementById("shrink");
+        const direction = document.getElementById("direction");
+        const wrap = document.getElementById("wrap");
+        const count = document.getElementById("count");
+        const gap = document.getElementById("gap");
+
+        function createItems(num) {
+            container.innerHTML = "";
+            for (let i = 1; i <= num; i++) {
+                const div = document.createElement("div");
+                div.className = "item";
+                div.textContent = i;
+                container.appendChild(div);
+            }
+        }
+
+        function updateFlex() {
+            container.style.justifyContent = justify.value;
+            container.style.alignItems = align.value;
+            container.style.alignContent = alignContent.value;
+            container.style.flexDirection = direction.value;
+            container.style.flexWrap = wrap.value;
+            container.style.gap = gap.value + "px";
+
+            document.querySelectorAll(".item").forEach(el => {
+                el.style.flexGrow = grow.value;
+                el.style.flexShrink = shrink.value;
+            });
+            updateItemSizeByDirection();
+            // 🚦 Logic disable thông minh
+            updateDisabledStates();
+        }
+
+        function updateItemSizeByDirection() {
+            const dir = direction.value;
+            const items = document.querySelectorAll(".item");
+            const isStretch = (align.value === "stretch");
+            const isWrap = wrap.value !== "nowrap";
+
+            items.forEach(item => {
+
+                if (!isStretch) {
+                    // Không stretch → ép item thành hình vuông 80x80
+                    item.style.width = "80px";
+                    item.style.height = "80px";
+                    return;
+                }
+
+                // Stretch
+                if (dir === "row") {
+                    item.style.width = "80px"; // trục chính = row, width cố định
+                    if (isWrap) {
+                        // wrap + stretch → để Flexbox tự stretch theo hàng
+                        item.style.height = "";
+                    } else {
+                        // nowrap → stretch theo container
+                        item.style.height = "100%";
+                    }
+                } else { // column
+                    item.style.height = "80px"; // trục chính = column, height cố định
+                    if (isWrap) {
+                        // wrap + stretch → để Flexbox tự stretch theo hàng
+                        item.style.width = "";
+                    } else {
+                        // nowrap → stretch theo container
+                        item.style.width = "100%";
+                    }
+                }
+            });
+        }
+
+
+
+
+        function updateDisabledStates() {
+            // Nếu wrap = nowrap → align-content vô dụng
+            alignContent.disabled = (wrap.value === "nowrap");
+
+            // Nếu flex-grow > 0 → justify-content gần như vô nghĩa (chiếm hết chiều rộng)
+            justify.disabled = (parseInt(grow.value) > 0);
+
+            // Nếu item có height cố định → align-items: stretch không có tác dụng,
+            // nhưng vẫn để người dùng chọn (vì chỉ 1 phần vô dụng)
+            // => Không disable align-items.
+
+            // Nếu wrap khác nowrap mà direction = column → align-content lúc này canh theo chiều ngang
+            // vẫn hợp lệ, nên không cần disable.
+
+            // Nếu flex-direction = column → trục chính dọc, nhưng justify vẫn hoạt động nên giữ nguyên.
+
+            // Nếu wrap = nowrap → align-content stretch bị vô nghĩa
+            // (đã xử lý ở trên)
+
+            // shrink luôn hoạt động, nên không disable.
+        }
+
+        createItems(count.value);
+        updateFlex();
+
+
+        [justify, align, alignContent, grow, shrink, direction, wrap, gap].forEach(sel => {
+            sel.addEventListener("change", updateFlex);
+        });
+
+        count.addEventListener("input", () => {
+            createItems(count.value);
+            updateFlex();
+        });
+    </script>
+
+</body>
+
+</html>
