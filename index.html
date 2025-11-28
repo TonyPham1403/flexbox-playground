@@ -1,6 +1,3 @@
-không ổn, khi tôi liên tục đổi sang row rồi column rồi row, thì width và height của item bị auto đè mất hoàn toàn, không
-trả lại 80px
-
 <!DOCTYPE html>
 <html lang="vi">
 
@@ -58,7 +55,7 @@ trả lại 80px
             /* width: 80px;
             height: auto; */
             width: 80px;
-            height: 80px;
+            /* height: 80px; */
             background: #4a90e2;
             color: white;
             display: flex;
@@ -69,6 +66,28 @@ trả lại 80px
             border-radius: 6px;
             flex-grow: 0;
             flex-shrink: 1;
+            position: relative;
+
+            /* THÊM DÒNG NÀY VÀO CSS */
+            min-height: 80px;
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            right: 6px;
+            bottom: 6px;
+            background: rgba(255, 255, 255, 0.85);
+            border-radius: 2px;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+            cursor: se-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: #333;
+            user-select: none;
         }
     </style>
 </head>
@@ -156,6 +175,12 @@ trả lại 80px
             Số lượng ô:
             <input id="count" type="number" min="1" max="100" value="6">
         </label>
+        <label>
+            <button id="resetSizes" type="button">Reset kích thước</button>
+        </label>
+        <label>
+            <button id="undoReset" type="button" disabled>Undo reset</button>
+        </label>
     </div>
 
     <div class="container" id="frame"></div>
@@ -178,6 +203,13 @@ trả lại 80px
                 const div = document.createElement("div");
                 div.className = "item";
                 div.textContent = i;
+                // add resize handle
+                const handle = document.createElement('span');
+                handle.className = 'resize-handle';
+                handle.title = 'Kéo để thay đổi kích thước\nDouble-click để reset';
+                handle.textContent = '';
+                div.appendChild(handle);
+                initResizeHandle(div, handle);
                 container.appendChild(div);
             }
         }
@@ -206,34 +238,91 @@ trả lại 80px
             const isWrap = wrap.value !== "nowrap";
 
             items.forEach(item => {
+                const isManual = item.dataset.manualSize === 'true';
 
                 if (!isStretch) {
                     // Không stretch → ép item thành hình vuông 80x80
-                    item.style.width = "80px";
-                    item.style.height = "80px";
+                    if (!isManual) {
+                        item.style.width = "80px";
+                        item.style.height = "80px";
+                    }
                     return;
                 }
 
                 // Stretch
                 if (dir === "row") {
-                    item.style.width = "80px"; // trục chính = row, width cố định
+                    if (!isManual) item.style.width = "80px"; // trục chính = row, width cố định
                     if (isWrap) {
                         // wrap + stretch → để Flexbox tự stretch theo hàng
-                        item.style.height = "";
+                        if (!isManual) item.style.height = "";
                     } else {
                         // nowrap → stretch theo container
-                        item.style.height = "100%";
+                        if (!isManual) item.style.height = "100%";
                     }
                 } else { // column
-                    item.style.height = "80px"; // trục chính = column, height cố định
+                    if (!isManual) item.style.height = "80px"; // trục chính = column, height cố định
                     if (isWrap) {
                         // wrap + stretch → để Flexbox tự stretch theo hàng
-                        item.style.width = "";
+                        if (!isManual) item.style.width = "";
                     } else {
                         // nowrap → stretch theo container
-                        item.style.width = "100%";
+                        if (!isManual) item.style.width = "100%";
                     }
                 }
+            });
+        }
+
+        // Initialize a resize handle for an item
+        function initResizeHandle(item, handle) {
+            let startX = 0, startY = 0, startW = 0, startH = 0;
+            let pointerId = null;
+
+            handle.addEventListener('pointerdown', (e) => {
+                e.stopPropagation();
+                pointerId = e.pointerId;
+                handle.setPointerCapture(pointerId);
+                startX = e.clientX;
+                startY = e.clientY;
+                const rect = item.getBoundingClientRect();
+                startW = rect.width;
+                startH = rect.height;
+                // prevent text selection
+                document.body.style.userSelect = 'none';
+
+                function onPointerMove(ev) {
+                    if (ev.pointerId !== pointerId) return;
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+                    // compute new size, enforce minimum
+                    const newW = Math.max(20, Math.round(startW + dx));
+                    const newH = Math.max(20, Math.round(startH + dy));
+                    item.style.width = newW + 'px';
+                    item.style.height = newH + 'px';
+                    item.dataset.manualSize = 'true';
+                }
+
+                function onPointerUp(ev) {
+                    if (ev.pointerId === pointerId) {
+                        try { handle.releasePointerCapture(pointerId); } catch (e) { }
+                        pointerId = null;
+                        document.removeEventListener('pointermove', onPointerMove);
+                        document.removeEventListener('pointerup', onPointerUp);
+                        document.body.style.userSelect = '';
+                    }
+                }
+
+                document.addEventListener('pointermove', onPointerMove);
+                document.addEventListener('pointerup', onPointerUp);
+            });
+
+            // double-click on handle resets manual size
+            handle.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                delete item.dataset.manualSize;
+                // clear inline sizes so updateFlex can reapply defaults
+                item.style.width = '';
+                item.style.height = '';
+                updateFlex();
             });
         }
 
@@ -272,6 +361,53 @@ trả lại 80px
 
         count.addEventListener("input", () => {
             createItems(count.value);
+            updateFlex();
+        });
+
+        // Reset manual sizes for all items (with snapshot for undo)
+        const resetBtn = document.getElementById('resetSizes');
+        const undoBtn = document.getElementById('undoReset');
+        let lastResetSnapshot = null;
+
+        resetBtn.addEventListener('click', () => {
+            // take snapshot of current per-item manual flags and inline sizes
+            const items = Array.from(document.querySelectorAll('.item'));
+            lastResetSnapshot = items.map(item => ({
+                text: item.textContent,
+                manual: item.dataset.manualSize || null,
+                width: item.style.width || null,
+                height: item.style.height || null
+            }));
+
+            // perform reset
+            items.forEach(item => {
+                delete item.dataset.manualSize;
+                item.style.width = '';
+                item.style.height = '';
+            });
+            updateFlex();
+            // enable undo
+            undoBtn.disabled = false;
+        });
+
+        // Undo the last reset (restore snapshot)
+        undoBtn.addEventListener('click', () => {
+            if (!lastResetSnapshot) return;
+            const items = Array.from(document.querySelectorAll('.item'));
+            // restore to matching items by index (ignores extra/missing items)
+            lastResetSnapshot.forEach((snap, idx) => {
+                const item = items[idx];
+                if (!item) return;
+                if (snap.manual === null) delete item.dataset.manualSize;
+                else item.dataset.manualSize = snap.manual;
+                if (snap.width === null) item.style.width = '';
+                else item.style.width = snap.width;
+                if (snap.height === null) item.style.height = '';
+                else item.style.height = snap.height;
+            });
+            // clear snapshot and disable undo
+            lastResetSnapshot = null;
+            undoBtn.disabled = true;
             updateFlex();
         });
     </script>
