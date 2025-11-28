@@ -386,8 +386,9 @@
                 item.style.height = '';
             });
             updateFlex();
-            // enable undo
+            // enable undo and disable reset to prevent repeated resets
             undoBtn.disabled = false;
+            resetBtn.disabled = true;
         });
 
         // Undo the last reset (restore snapshot)
@@ -405,9 +406,10 @@
                 if (snap.height === null) item.style.height = '';
                 else item.style.height = snap.height;
             });
-            // clear snapshot and disable undo
+            // clear snapshot and disable undo, re-enable reset
             lastResetSnapshot = null;
             undoBtn.disabled = true;
+            resetBtn.disabled = false;
             updateFlex();
         });
     </script>
